@@ -1,3 +1,1 @@
-# web-platform-2zk6le
-
-[Edit on StackBlitz ⚡️](https://stackblitz.com/edit/web-platform-2zk6le)
+List<ChannelRefBean> channelRefBean1 = objectMapper.readValue(req.getReader(), new TypeReference<List<ChannelRefBean>>(){} );

@@ -1,6 +1,7 @@
 package com.jio.crm.l2o.utils;
 
 import java.beans.PropertyDescriptor;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -8,8 +9,13 @@ import java.io.InputStream;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
+
+import javax.servlet.http.HttpServletRequest;
+
+import org.apache.commons.io.IOUtils;
 
 public class MapperUtil<E, M> {
 
@@ -53,28 +59,17 @@ public class MapperUtil<E, M> {
 
 	}
 
-	public List<M> excelToPojo(final Class<M> clazz, final String fileName) throws Exception {
+	public List<M> excelToPojo(final Class<M> clazz, HttpServletRequest req) throws Exception {
 
 		InputStream is = null;
-
-		FileInputStream fileInputStream2 = null;
-
-		String path = "/configuration/";
 
 		List<M> entites = null;
 
 		try {
 
-			String profile = System.getProperty("profile");
-			if (profile != null && profile.equals("dev")) {
-				fileInputStream2 = new FileInputStream(new File("." + path + fileName + ".xlsx"));
+			byte[] byteArray = IOUtils.toByteArray(req.getInputStream());
 
-			} else {
-				fileInputStream2 = new FileInputStream(new File(".." + path + fileName + ".xlsx"));
-
-			}
-
-			is = fileInputStream2;
+			is = new ByteArrayInputStream(byteArray);
 
 		} catch (FileNotFoundException e1) {
 
@@ -91,4 +86,66 @@ public class MapperUtil<E, M> {
 		return entites;
 
 	}
+
+	public M mapObjects(final E entity, final Class<M> clazz, final Class<E> entityClass) throws Exception {
+
+		M model = null;
+
+		final List<String> planFields = Arrays.asList(entityClass.getDeclaredFields()).stream().map(Field::getName)
+				.collect(Collectors.toList());
+
+		model = clazz.getDeclaredConstructor().newInstance();
+		for (final Field f : model.getClass().getDeclaredFields()) {
+			if (planFields.contains(f.getName())) {
+				try {
+					new PropertyDescriptor(f.getName(), clazz).getWriteMethod().invoke(model,
+							new PropertyDescriptor(f.getName(), entityClass).getReadMethod().invoke(entity));
+				} catch (Exception e) {
+
+					e.printStackTrace();
+				}
+			}
+		}
+
+		return model;
+
+	}
+
+	/**
+	 * Method which maps a list of entities to respective models
+	 * 
+	 * @param entities
+	 * @param clazz
+	 * @param entityClass
+	 * @return
+	 * @throws InstantiationException
+	 * @throws IllegalAccessException
+	 */
+	public List<M> mapObjects(final List<E> entities, final Class<M> clazz, final Class<E> entityClass)
+			throws InstantiationException, IllegalAccessException {
+		final List<M> models = new ArrayList<>();
+		final List<String> planFields = Arrays.asList(entityClass.getDeclaredFields()).stream().map(Field::getName)
+				.collect(Collectors.toList());
+		for (final E entity : entities) {
+			if (entity != null) {
+				M model = null;
+				try {
+					model = clazz.getDeclaredConstructor().newInstance();
+					for (final Field f : model.getClass().getDeclaredFields()) {
+						if (planFields.contains(f.getName())) {
+							new PropertyDescriptor(f.getName(), clazz).getWriteMethod().invoke(model,
+									new PropertyDescriptor(f.getName(), entityClass).getReadMethod().invoke(entity));
+						}
+					}
+				} catch (final Exception e) {
+					e.printStackTrace();
+				} finally {
+					models.add(model);
+				}
+
+			}
+		}
+		return models;
+	}
+
 }
